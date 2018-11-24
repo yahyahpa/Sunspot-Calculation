@@ -1,0 +1,197 @@
+#jlong
+
+
+#the biggest issue i found with this program was managing the big O(n). 
+#To calculate the monthsmoothed value i created a list that contained 13 values at most
+#when the list len was 13 it would calcluate the smooth value for index 6 of that list and
+#progressively append the next monthtotal value to the list  using the values in the first outputed file (monthtotal.csv)
+#and remove the value at index 0
+
+year = 0
+def openfile():
+    global sunspots_csv
+    global month_total_dic
+    file_open = input('Enter a sunspot csv file to open add ".csv" to the end:\n')
+    #open csv to be analyzed
+    sunspots_csv = open(file_open,'r')
+    #dictionary of months(by their numeric value) and sunspot observered
+    month_total_dic = {}
+
+    
+def closefile():
+    global sunspots_csv
+    #closes csv after being analyzed
+    sunspots_csv.close()
+    #also appends the final years monthly sunspot count
+    append_month_total()
+    reset_month_total_dic()
+    
+def analyzefile():
+    global sunspots_csv
+    #Seperate csv into individual lines
+    data_lines = sunspots_csv.readlines()        
+    #Split individual lines into tokens in a list
+    for line in data_lines:
+        global data_tokens
+        #to reduce big o most functions are going to be contained here
+        data_tokens = line.split(',')
+        #checks for year change
+        yearcheck()
+        #appends month total at start of each year
+        monthtotal()
+
+def yearcheck():
+    global month_total_dic
+    global year
+    global data_tokens
+    #checks to see if data_tokens are in the same year
+    if int(data_tokens[0]) != year:
+        '''This assumes we are not starting at a year = 0 mark'''
+        if year == 0:
+            year = int(data_tokens[0])
+        else:
+            #append data before reseting dictionary
+            append_month_total()
+            #reset month total dictionary for new year
+            reset_month_total_dic()
+            #update year to new year
+            year = int(data_tokens[0])
+
+
+def append_month_total():    
+    #append monthlytotal with dictionary values
+    with open('monthtotal.csv', 'a') as monthtotal_csv:
+        for month in list(month_total_dic.items()):            
+            monthtotal_csv.write('%d, %d, %d\n' % (year, month[0], month[1]))
+
+def reset_month_total_dic():
+    global month_total_dic
+    #reset monthly total sunspot count dictionary
+    month_total_dic = {}
+
+#first file output
+def monthtotal():
+    '''Totals the indivdual monthly values per year'''
+    global month_total_dic
+    global data_tokens
+    #checks to see if observed day count of sunspots is a postive value   
+    if data_tokens[4].strip().isdigit() == True:        
+        '''updates dictionary value of sunspots counted for the day by its month'''
+        #if month and count already are in dictionary add to it
+        try:
+            month_total_dic[int(data_tokens[1])] += int(data_tokens[4])
+        #if not create a new key and value for dictionary
+        except KeyError:
+            month_total_dic[int(data_tokens[1])] = int(data_tokens[4])
+
+#open monthtotal for smooth calculations
+def open_monthtotal():
+    global monthtotal_r_csv
+    monthtotal_r_csv = open('monthtotal.csv', 'r')
+    
+#close monthtotal after smooth calculations
+def close_monthtotal():
+    global monthtotal_r_csv
+    monthtotal_r_csv.close()
+    
+def calculate_smoothvalue():
+    '''Calculates smooth value'''
+    global smoothmonth_lst
+    global smooth_value
+    #once lst has 13 months values in the list
+    if len(smoothmonth_lst) == 13:
+        #half the start point
+        first_endpoint = float(smoothmonth_lst[0])/2
+        #half the end point
+        second_endpoint = float(smoothmonth_lst[12])/2
+        #calculate the smooth month value 
+        smooth_value = (sum(smoothmonth_lst[1:12])+first_endpoint+second_endpoint)/12
+        #for index 6 of smoothmonth_lst
+        
+def append_smooth_month_csv():
+    '''appends smooth month csv'''
+    global first_six
+    #these are the data tokens of month-total, from the first file output
+    global data_tokens_monthtotal
+    global smooth_value
+    global smoothmonth_lst
+    if first_six <6:
+        #append the first six
+        with open('monthsmoothed.csv','a') as monthsmoothed_csv:
+            first_six+=1
+            monthsmoothed_csv.write('%d, %d, %f\n'% (int(data_tokens_monthtotal[0]),int(data_tokens_monthtotal[1]),float(data_tokens_monthtotal[2])))
+    elif (first_six == 6) and len(smoothmonth_lst) < 12:
+        #appends the last six smooth values
+        with open('monthsmoothed.csv','a') as monthsmoothed_csv:
+            monthsmoothed_csv.write('%d, %d, %f\n'% (int(data_tokens_monthtotal[0]),int(data_tokens_monthtotal[1]),float(data_tokens_monthtotal[2])))
+            
+    elif (first_six == 6) and (len(smoothmonth_lst) >= 12):
+        #appends everything between the first six and last 6 month's smooth value
+        with open('monthsmoothed.csv','a') as monthsmoothed_csv:
+            monthsmoothed_csv.write('%d, %d, %f\n'% (int(data_tokens_monthtotal[0]),int(data_tokens_monthtotal[1]),float(smooth_value)))
+
+            
+def analyze_monthtotal():   
+    global monthtotal_r_csv
+    global smoothmonth_lst
+    global first_six
+    global data_tokens_monthtotal
+    global next_line_token
+    #lst used to calculate smooth months
+    smoothmonth_lst=[]
+    #first_six is to make sure that first six values arent smoothed
+    first_six = 0
+    #count of index being added to lst
+    count = 13
+    #Seperate csv into individual lines
+    data_lines = monthtotal_r_csv.readlines()        
+    #Split individual lines into tokens in a list
+    for line in data_lines[:6]:
+        #add first 6 indexes to list- no smooth value calculation
+        data_tokens_monthtotal = line.split(',')
+        data_tokens_monthtotal[2] = data_tokens_monthtotal[2].replace('\n','')
+        smoothmonth_lst.append(int(data_tokens_monthtotal[2]))       
+        append_smooth_month_csv()
+        
+    for line in data_lines[6:13]:
+        #finish adding to list so it has 13 elements in it
+        #create data tokens of monthtotal
+        data_tokens_monthtotal = line.split(',')
+        data_tokens_monthtotal[2] = data_tokens_monthtotal[2].replace('\n','')
+        smoothmonth_lst.append(int(data_tokens_monthtotal[2]))
+        
+    for line in data_lines[6:]:
+        #go back to index 6 and start calculating smooth value as it runs through csv
+        calculate_smoothvalue()
+        
+        data_tokens_monthtotal = line.split(',')
+        data_tokens_monthtotal[2] = data_tokens_monthtotal[2].replace('\n','')
+        try:
+            #set up new element to be added
+            next_line = data_lines[count]
+            next_line_token = next_line.split(',')
+            #remove '\n' from index2
+            next_line_token[2] = next_line_token[2].replace('\n','')
+            smoothmonth_lst.append(int(next_line_token[2]))
+        except IndexError:
+            #once its at the final values of sunspots where there are no more values (n+6) to append to list to calculate smooth value
+            pass
+        #delete index 0 to maintain 13 elements at max
+        del smoothmonth_lst[0]
+        append_smooth_month_csv()
+        count +=1
+
+def alldone():
+    print('\nAll done monthtotal.csv and monthsmoothed.csv are ready to be checked\n')
+    print('Make sure to delete the created files before re-running program as it will append to the already created file\n')
+
+def function_manager():
+    openfile()
+    analyzefile()
+    closefile()
+    open_monthtotal()
+    analyze_monthtotal()
+    close_monthtotal()
+    alldone()
+    
+function_manager()
